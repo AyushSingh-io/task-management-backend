@@ -10,6 +10,7 @@ const userSchema = new Schema({
         unique: true,
         lowercase: true,
         trim: true,
+        match: [/^[a-zA-Z0-9_]+$/, "Invalid username"],
         minlength: 3,
         maxlength: 30
     },
@@ -19,12 +20,13 @@ const userSchema = new Schema({
         required: true,
         unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        match: [/^\S+@\S+\.\S+$/, "Invalid email"]
     },
 
     avatar: {
         type: String,
-        required: true
+        default : ""
     },
 
     refreshToken: {
@@ -35,7 +37,6 @@ const userSchema = new Schema({
         type: String,
         required: [true, "Password is required"],
         minlength: [8, "Password must be atleast 8 characters"],
-        required: true,
         select: false
     }
 
