@@ -26,7 +26,8 @@ const ProjectSchema = new Schema({
     },
     
     coverImage : {
-        type : String
+        type : String,
+        default : ""
     }
 
 }, { timestamps: true })
