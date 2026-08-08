@@ -9,10 +9,6 @@ import { getProjectUserRole, isTaskAssigned } from "../services/permission.servi
 
 
 const createTask = asyncHandler(async (req, res) => {
-    //todo :  Future improvement :"assignedTo" belongs to the project's members before creating the task. Right now, any user ID could be assigned
-
-    //todo : replace  owner-only check with a membership/role check later.
-
     const { projectId } = req.params
     const { name, description, status, priority, assignedTo, dueDate } = req.body
 
@@ -24,22 +20,10 @@ const createTask = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Name and description are required")
     }
 
-    // const projectExists = await Project.exists({
-    //     _id: projectId,
-    //     owner: req.user._id
-    // })
-
-    // if (!projectExists) {
-    //     throw new ApiError(404, "Project not found or unauthorized request")
-    // }
-
     const role = await getProjectUserRole(projectId, req.user._id)
     if (role !== "ADMIN" && role !== "OWNER") {
         throw new ApiError(403, "Unauthorized request")
     }
-
-    const fields = { name, description, status, priority, assignedTo, dueDate }
-    const creationFields = { project: projectId }
 
     const existedTask = await Task.findOne({
         name,
@@ -48,6 +32,17 @@ const createTask = asyncHandler(async (req, res) => {
 
     if (existedTask) {
         throw new ApiError(400, "Task with name already exists")
+    }
+
+    const fields = { name, description, status, priority, dueDate }
+    const creationFields = { project: projectId }
+
+    if (assignedTo !== undefined) {
+        const isMemberOfProject = await getProjectUserRole(projectId, assignedTo)
+        if (isMemberOfProject === "NON_MEMBER") {
+            throw new ApiError(400, "Cannot assign a task to a non-member")
+        }
+        creationFields.assignedTo = assignedTo
     }
 
     for (const [key, value] of Object.entries(fields)) {
@@ -191,23 +186,21 @@ const assignTask = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Task not found")
     }
 
-    const taskOldAssignee = task.assignedTo
-
     const projectId = task.project
     const role = await getProjectUserRole(projectId, req.user._id)
-    const isAssignee = await isTaskAssigned(task, req.user._id)
 
     if (role === "MEMBER" || role === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
 
+    //check if assignedTo is member of the project:
+    const isMember = await getProjectUserRole(projectId, assignedTo)
+    if (isMember === "NON_MEMBER") {
+        throw new ApiError(400, "Cannot assign a task to a non-member")
+    }
+
     task.assignedTo = assignedTo
     await task.save()
-
-    await ProjectMember.create({
-        member: assignedTo,
-        project: projectId,
-    })
 
     return res.status(200).json(new ApiResponse(200, task, "Assigned User successfully"))
 
