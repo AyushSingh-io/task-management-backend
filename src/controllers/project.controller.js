@@ -5,6 +5,9 @@ import asyncHandler from "../utilities/asyncHandler.js"
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utilities/cloudinary.js"
 
 
+//todo : apply the logic of projectMember schema:
+
+
 const createProject = asyncHandler(async (req, res) => {
     const { name, description } = req.body
     const coverImageLocalPath = req.file?.path
