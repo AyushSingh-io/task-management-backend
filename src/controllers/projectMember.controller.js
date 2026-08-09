@@ -6,6 +6,8 @@ import ApiResponse from "../utilities/apiResponse.js"
 import asyncHandler from "../utilities/asyncHandler.js"
 import { getProjectUserRole } from "../services/permission.service.js"
 import { User } from "../models/user.model.js"
+import mongoose from "mongoose"
+import { Project } from "../models/project.model.js"
 
 
 
@@ -141,10 +143,76 @@ const changeMemberRole = asyncHandler(async (req, res) => {
             }
         )
 
-        return res.status(200).json(new ApiResponse(200, member, "Role change successfully"))
+        return res.status(200).json(new ApiResponse(200, member, "Role changed successfully"))
     }
 
     //todo : transction for tranfer ownership if (role == "OWNER")
+
+    const session = await mongoose.startSession();
+
+    try {
+        session.startTransaction()
+
+        const newOwner = await ProjectMember.findOneAndUpdate(
+            {
+                project: projectId,
+                member: memberId
+            },
+            {
+                $set: {
+                    role: "OWNER"
+                }
+            },
+            {
+                new: true,
+                runValidators: true,
+                session
+            }
+        );
+
+        const oldOwner = await ProjectMember.findOneAndUpdate(
+            {
+                project: projectId,
+                member: req.user._id,
+            },
+            {
+                $set: {
+                    role: "MEMBER"
+                }
+            },
+            {
+                new: true,
+                runValidators: true,
+                session
+            }
+        );
+
+        const updatedProject = await Project.findByIdAndUpdate(
+            projectId,
+            {
+                $set: {
+                    owner: memberId
+                }
+            },
+            {
+                new: true,
+                runValidators: true,
+                session
+            }
+        );
+
+        await session.commitTransaction()
+
+        return res.status(200).json(new ApiResponse(200, newOwner, "Ownership transferred successfully"))
+
+    } catch (error) {
+
+        await session.abortTransaction()
+        throw  error
+
+    } finally {
+        session.endSession()
+    }
 
 
 })
