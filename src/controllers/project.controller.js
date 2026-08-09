@@ -3,9 +3,11 @@ import ApiError from "../utilities/apiError.js"
 import ApiResponse from "../utilities/apiResponse.js"
 import asyncHandler from "../utilities/asyncHandler.js"
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utilities/cloudinary.js"
+import { ProjectMember } from "../models/projectMember.model.js"
+import mongoose from "mongoose"
+import { Task } from "../models/task.model.js"
+import { Comment } from "../models/comment.model.js"
 
-
-//todo : apply the logic of projectMember schema:
 
 
 const createProject = asyncHandler(async (req, res) => {
@@ -28,23 +30,48 @@ const createProject = asyncHandler(async (req, res) => {
     //upload image 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
-    //create new project
+    //create new project and add as owner to projectMember:
+    const session = await mongoose.startSession();
+
     try {
-        const project = await Project.create({
+        session.startTransaction();
+
+        const project = await Project.create([{
             name: name,
             description: description,
             coverImage: coverImage?.url || "",
             owner: req.user._id
-        })
+        }],
+            { session }
+        );
 
-        return res.status(201).json(new ApiResponse(201, project, "New project created successfully"))
+        console.log("project (should be as array)", project)
 
-    } catch (error) {
+        const addProjectMemberasOwner = await ProjectMember.create([{
+            member: req.user._id,
+            project: project[0]._id,
+            role: "OWNER"
+        }],
+            { session }
+        );
+
+        await session.commitTransaction();
+        return res.status(201).json(new ApiResponse(201, project[0], "New project created successfully"))
+
+    }
+
+    catch (error) {
+
         //delete the uploaded image from cloudinary
         if (coverImage?.url)
-            await deleteFromCloudinary(coverImage.url)
+            await deleteFromCloudinary(coverImage.url);
 
-        throw error
+        await session.abortTransaction();
+        throw error;
+    }
+
+    finally {
+        session.endSession();
     }
 
 })
@@ -173,9 +200,10 @@ const updateProjectById = asyncHandler(async (req, res) => {
     } catch (error) {
         //delete orphan file from cloudinary
         if (coverImage?.url) {
-            await deleteFromCloudinary(coverImage.url)
+            await deleteFromCloudinary(coverImage.url);
         }
-        throw error
+
+        throw error;
     }
 
 
@@ -189,19 +217,80 @@ const deleteProjectById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "ProjectId is required")
     }
 
-    const deletedProject = await Project.findOneAndDelete({
-        owner: req.user._id,
-        _id: projectId
-    })
+    const session = await mongoose.startSession()
 
-    if (!deletedProject) {
-        throw new ApiError(404, "Project not found or Unauthorized request")
+    try {
+        session.startTransaction();
+
+        //find the project:
+        const project = await Project.findOne(
+            {
+                owner: req.user._id,
+                _id: projectId,
+            },
+        ).session(session)
+
+        if (!project) {
+            throw new ApiError(404, "Project not found or Unauthorized request")
+        }
+
+        //delete all comments of the tasks from the project:
+        const tasks = await Task.find(
+            { project: projectId },
+            { _id: 1 },
+            { session }
+        )
+
+        const taskIds = tasks.map(task => task._id);
+
+        await Comment.deleteMany(
+            {
+                task: {
+                    $in: taskIds
+                }
+            },
+            { session }
+        )
+
+        //delete tasks of the project:
+        await Task.deleteMany(
+            { project: projectId },
+            { session }
+        )
+
+        //delete all members of the project:
+        await ProjectMember.deleteMany(
+            {
+                project: projectId,
+            },
+            { session }
+        )
+
+        //delete the project :
+        await Project.deleteOne(
+            { _id: projectId },
+            { session }
+        )
+
+
+        await session.commitTransaction();
+
+        //delete cloudinary file:
+        if (project.coverImage)
+            await deleteFromCloudinary(project.coverImage)
+
+        return res.status(200).json(new ApiResponse(200, project, "Deleted project successfully"))
+
     }
 
-    //delete cloudinary file:
-    await deleteFromCloudinary(deletedProject.coverImage)
+    catch (error) {
+        await session.abortTransaction();
+        throw error;
+    }
 
-    return res.status(200).json(new ApiResponse(200, deletedProject, "Deleted project successfully"))
+    finally {
+        session.endSession()
+    }
 
 })
 
