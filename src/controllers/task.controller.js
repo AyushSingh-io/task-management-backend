@@ -65,7 +65,7 @@ const getAllTasks = asyncHandler(async (req, res) => {
     }
 
     const role = await getProjectUserRole(projectId, req.user._id)
-    if (role !== "ADMIN" && role !== "OWNER") {
+    if (role === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
 
@@ -93,9 +93,8 @@ const getTaskById = asyncHandler(async (req, res) => {
     const projectId = task.project
 
     const role = await getProjectUserRole(projectId, req.user._id)
-    const isAssignee = await isTaskAssigned(task, req.user._id)
-
-    if (role === "NON_MEMBER" || (role === "MEMBER" && isAssignee === false)) {
+    
+    if (role === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
 
