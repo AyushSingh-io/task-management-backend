@@ -34,15 +34,12 @@ router.route("/")
     .post(upload.single("coverImage"), createProject)
     .get(getAllProjects)
 
-router.route("/:id").get(getProjectById)
+router.route("/:projectId").get(getProjectById)
+router.route("/:projectId").patch(upload.single("coverImage"), updateProjectById)
+router.route("/:projectId").delete(deleteProjectById)
 
-router.route("/:id").patch(upload.single("coverImage"), updateProjectById)
-
-router.route("/:id").delete(deleteProjectById)
-
-router.route("/:id/tasks").post(createTask)
-
-router.route("/:id/tasks").get(getAllTasks)
+router.route("/:projectId/tasks").post(createTask)
+router.route("/:projectId/tasks").get(getAllTasks)
 
 router.route("/:projectId/members/:memberId").post(addMember)
 router.route("/:projectId/members/:memberId").delete(removeMember)
