@@ -1,10 +1,10 @@
-import { Project } from "../models/project.model.js"
 import { Task } from "../models/task.model.js"
-import { ProjectMember } from "../models/projectMember.model.js"
 import ApiError from "../utilities/apiError.js"
 import ApiResponse from "../utilities/apiResponse.js"
 import asyncHandler from "../utilities/asyncHandler.js"
 import { getProjectUserRole, isTaskAssigned } from "../services/permission.service.js"
+import mongoose from "mongoose"
+import { Comment } from "../models/comment.model.js"
 
 
 
@@ -165,15 +165,39 @@ const deleteTaskById = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
 
-    const deletedTask = await Task.findByIdAndDelete(taskId)
+    const session = await mongoose.startSession();
 
-    return res.status(200).json(new ApiResponse(200, deletedTask, "Deleted task successfully"))
+    try {
+        session.startTransaction();
+
+        //delete  comments of the task:
+        await Comment.deleteMany(
+            { task: taskId },
+            { session }
+        )
+
+        //delete the task:
+        const deletedTask = await Task.findByIdAndDelete(
+            taskId,
+            { session }
+        )
+
+        await session.commitTransaction()
+        return res.status(200).json(new ApiResponse(200, deletedTask, "Deleted task successfully"))
+
+    } 
+    catch (error) {
+        await session.abortTransaction()
+        throw error
+    }
+    finally {
+        session.endSession()
+    }
 
 })
 
 
 const assignTask = asyncHandler(async (req, res) => {
-    //todo : correct the logic of projectMember
     const { taskId } = req.params
     const { assignedTo } = req.body
 
