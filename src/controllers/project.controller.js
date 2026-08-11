@@ -1,4 +1,4 @@
-import Project from "../models/project.model.js"
+import {Project} from "../models/project.model.js"
 import ApiError from "../utilities/apiError.js"
 import ApiResponse from "../utilities/apiResponse.js"
 import asyncHandler from "../utilities/asyncHandler.js"
@@ -115,7 +115,7 @@ const getProjectById = asyncHandler(async (req, res) => {
 
 const updateProjectById = asyncHandler(async (req, res) => {
     const { projectId } = req.params
-    const { name, description } = req.body
+    const { name, description , status} = req.body
     const coverImageLocalPath = req.file?.path
 
     if (!projectId) {
@@ -125,6 +125,7 @@ const updateProjectById = asyncHandler(async (req, res) => {
     if (
         name === undefined &&
         description === undefined &&
+        status === undefined &&
         !coverImageLocalPath
     ) {
         throw new ApiError(400, "Nothing to update");
@@ -146,7 +147,7 @@ const updateProjectById = asyncHandler(async (req, res) => {
     });
 
     if (!project) {
-        throw new ApiError(404, "Project not found");
+        throw new ApiError(404, "Project not found or Unauthorized request");
     }
 
     const oldCoverImageUrl = project.coverImage;
@@ -158,6 +159,9 @@ const updateProjectById = asyncHandler(async (req, res) => {
     }
     if (description !== undefined) {
         updateFields.description = description
+    }
+    if( status !== undefined){
+        updateFields.status = status
     }
 
     let coverImage;
