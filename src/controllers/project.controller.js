@@ -83,10 +83,6 @@ const getAllProjects = asyncHandler(async (req, res) => {
         owner: req.user._id,
     })
 
-    if (!projects || !projects?.length) {
-        throw new ApiError(404, "Project not found")
-    }
-
     return res.status(200).json(new ApiResponse(200, projects, "All projects fetched successfully"))
 
 })
