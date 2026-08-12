@@ -32,4 +32,15 @@ const ProjectSchema = new Schema({
 
 }, { timestamps: true })
 
+
+ProjectSchema.index(
+    {
+        name : 1,
+        owner : 1
+    },
+    {
+        unique : true
+    }
+)
+
 export const Project = mongoose.model("Project", ProjectSchema)

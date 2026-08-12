@@ -1,4 +1,4 @@
-import {Project} from "../models/project.model.js"
+import { Project } from "../models/project.model.js"
 import ApiError from "../utilities/apiError.js"
 import ApiResponse from "../utilities/apiResponse.js"
 import asyncHandler from "../utilities/asyncHandler.js"
@@ -18,14 +18,14 @@ const createProject = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Name and description are required")
     }
 
-    const existedProject = await Project.findOne({
-        owner: req.user._id,
-        name
-    })
+    // const existedProject = await Project.findOne({
+    //     owner: req.user._id,
+    //     name
+    // })
 
-    if (existedProject) {
-        throw new ApiError(400, "Project with name already exists")
-    }
+    // if (existedProject) {
+    //     throw new ApiError(400, "Project with name already exists")
+    // }
 
     //upload image 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
@@ -62,11 +62,17 @@ const createProject = asyncHandler(async (req, res) => {
 
     catch (error) {
 
+        await session.abortTransaction();
+
         //delete the uploaded image from cloudinary
         if (coverImage?.url)
             await deleteFromCloudinary(coverImage.url);
 
-        await session.abortTransaction();
+        // Handle MongoDB duplicate-key error
+        if (error.code === 11000) {
+            throw new ApiError(409, "Project with this name already exists");
+        }
+
         throw error;
     }
 
@@ -111,7 +117,7 @@ const getProjectById = asyncHandler(async (req, res) => {
 
 const updateProjectById = asyncHandler(async (req, res) => {
     const { projectId } = req.params
-    const { name, description , status} = req.body
+    const { name, description, status } = req.body
     const coverImageLocalPath = req.file?.path
 
     if (!projectId) {
@@ -125,16 +131,6 @@ const updateProjectById = asyncHandler(async (req, res) => {
         !coverImageLocalPath
     ) {
         throw new ApiError(400, "Nothing to update");
-    }
-
-    const existedProject = await Project.findOne({
-        owner: req.user._id,
-        name: name,
-        _id: { $ne: projectId }
-    })
-
-    if (existedProject) {
-        throw new ApiError(400, "Project with name already exists")
     }
 
     const project = await Project.findOne({
@@ -156,7 +152,7 @@ const updateProjectById = asyncHandler(async (req, res) => {
     if (description !== undefined) {
         updateFields.description = description
     }
-    if( status !== undefined){
+    if (status !== undefined) {
         updateFields.status = status
     }
 
@@ -170,8 +166,9 @@ const updateProjectById = asyncHandler(async (req, res) => {
 
     }
 
+    let updatedProject;
     try {
-        const updatedProject = await Project.findOneAndUpdate(
+        updatedProject = await Project.findOneAndUpdate(
             {
                 _id: projectId,
                 owner: req.user._id
@@ -183,29 +180,50 @@ const updateProjectById = asyncHandler(async (req, res) => {
                 new: true,
                 runValidators: true
             }
-        )
+        );
 
         if (!updatedProject) {
-            throw new ApiError(404, "Project not found or Unauthorized request")
+            throw new ApiError(
+                404,
+                "Project not found or Unauthorized request"
+            );
         }
-
-        //delete old coverImage:
-        if (coverImage?.url) {
-            await deleteFromCloudinary(oldCoverImageUrl)
-        }
-
-        return res.status(200).json(new ApiResponse(200, updatedProject, "Updated project successfully"))
-
 
     } catch (error) {
-        //delete orphan file from cloudinary
+
+        // DB update failed -> new Cloudinary image is orphaned
         if (coverImage?.url) {
             await deleteFromCloudinary(coverImage.url);
+        }
+
+        if (error.code === 11000) {
+            throw new ApiError(
+                409,
+                "Project with this name already exists"
+            );
         }
 
         throw error;
     }
 
+    if (coverImage?.url && oldCoverImageUrl) {
+        try {
+            await deleteFromCloudinary(oldCoverImageUrl);
+        } catch (error) {
+            console.error(
+                "Failed to delete old project cover image:", error);
+        }
+    }
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                updatedProject,
+                "Updated project successfully"
+            )
+        );
 
 })
 
@@ -219,11 +237,12 @@ const deleteProjectById = asyncHandler(async (req, res) => {
 
     const session = await mongoose.startSession()
 
+    let project;
     try {
         session.startTransaction();
 
         //find the project:
-        const project = await Project.findOne(
+        project = await Project.findOne(
             {
                 owner: req.user._id,
                 _id: projectId,
@@ -272,14 +291,7 @@ const deleteProjectById = asyncHandler(async (req, res) => {
             { session }
         )
 
-
         await session.commitTransaction();
-
-        //delete cloudinary file:
-        if (project.coverImage)
-            await deleteFromCloudinary(project.coverImage)
-
-        return res.status(200).json(new ApiResponse(200, project, "Deleted project successfully"))
 
     }
 
@@ -291,6 +303,18 @@ const deleteProjectById = asyncHandler(async (req, res) => {
     finally {
         session.endSession()
     }
+
+    try {
+        //delete cloudinary file after successfull deletion:
+        if (project.coverImage)
+            await deleteFromCloudinary(project.coverImage)
+
+    } catch (error) {
+        console.error("Failed to delete old project cover image:", error);
+    }
+
+    return res.status(200).json(new ApiResponse(200, project, "Deleted project successfully"))
+
 
 })
 
