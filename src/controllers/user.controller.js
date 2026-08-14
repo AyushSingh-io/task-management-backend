@@ -78,8 +78,11 @@ const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Email or Username required")
     }
 
+    const normalizedEmail = email?.toLowerCase()
+    const normalizedUsername = username?.toLowerCase()
+
     const user = await User.findOne({
-        $or: [{ email }, { username }]
+        $or: [{ normalizedEmail }, { normalizedUsername }]
     }).select("+password")
 
     if (!user) {
@@ -173,7 +176,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 
     } catch (error) {
-        throw new ApiError(400, error?.message || "Invalid refresh token")
+        throw new ApiError(error?.code || 400, error?.message || "Invalid refresh token")
     }
 
 })
@@ -214,32 +217,45 @@ const updateProfile = asyncHandler(async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedUsername = username.trim().toLowerCase()
 
-    const existedUser = await User.findOne({
-        $or: [{ email : normalizedEmail }, { username : normalizedUsername}],
-        _id: { $ne: req.user._id }
-    })
+    // const existedUser = await User.findOne({
+    //     $or: [{ email : normalizedEmail }, { username : normalizedUsername}],
+    //     _id: { $ne: req.user._id }
+    // })
 
-    if(existedUser){
-        throw new ApiError(400, "Email or username already exists")
-    }
+    // if(existedUser){
+    //     throw new ApiError(400, "Email or username already exists")
+    // }
 
 
-    const updatedProfile = await User.findByIdAndUpdate(
-        req.user._id,
-        {
-            $set: {
-                username: normalizedUsername,
-                email: normalizedEmail
+    try {
+        const updatedProfile = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    username: normalizedUsername,
+                    email: normalizedEmail
+                }
+            },
+            {
+                new: true,
+                runValidators: true
             }
-        },
-        {
-            new: true
-        }
-    ).select("-refreshToken")
+        ).select("-refreshToken")
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, updatedProfile, "Update user profile successfully"))
+        if (!updatedProfile) {
+            throw new ApiError(404, "user not found")
+        }
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, updatedProfile, "Update user profile successfully"))
+
+    } catch (error) {
+        if (error.code === 11000) {
+            throw new ApiError(409, "Username or email already exists")
+        }
+        throw error
+    }
 
 })
 
