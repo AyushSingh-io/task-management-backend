@@ -28,18 +28,26 @@ const addMember = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User does not exist")
     }
 
-    const isAlreadyMember = await getProjectUserRole(projectId, memberId)
-    if (isAlreadyMember !== "NON_MEMBER") {
-        throw new ApiError(400, "Member already exists in the project")
+    // const isAlreadyMember = await getProjectUserRole(projectId, memberId)
+    // if (isAlreadyMember !== "NON_MEMBER") {
+    //     throw new ApiError(400, "Member already exists in the project")
+    // }
+
+    try {
+        const addedMember = await ProjectMember.create({
+            project: projectId,
+            member: memberId,
+            role: "MEMBER"
+        })
+    
+        return res.status(201).json(new ApiResponse(201, addedMember, "Add member to the project successfully"))
+
+    } catch (error) {
+        if(error.code === 11000){
+            throw new ApiError(409 , "Member elready exists in the project")
+        }
+        throw error;
     }
-
-    const addedMember = await ProjectMember.create({
-        project: projectId,
-        member: memberId,
-        role: "MEMBER"
-    })
-
-    return res.status(201).json(new ApiResponse(201, addedMember, "Add member to the project successfully"))
 
 })
 
@@ -56,21 +64,21 @@ const removeMember = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
 
-    const isUserExist = await User.findById(memberId)
-    if (!isUserExist) {
-        throw new ApiError(404, "User does not exist")
+    // const isUserExist = await User.findById(memberId)
+    // if (!isUserExist) {
+    //     throw new ApiError(404, "User does not exist")
+    // }
+
+    const toBeRemovedMemberRole = await getProjectUserRole(projectId, memberId)
+    if (toBeRemovedMemberRole === "NON_MEMBER") {
+        throw new ApiError(404, "Member does not exist in the project")
     }
 
-    const memberRoleInProject = await getProjectUserRole(projectId, memberId)
-    if (memberRoleInProject === "NON_MEMBER") {
-        throw new ApiError(400, "Member does not exist in the project")
-    }
-
-    if (memberRoleInProject === "OWNER") {
+    if (toBeRemovedMemberRole === "OWNER") {
         throw new ApiError(400, "Cannot remove the owner of the project")
     }
 
-    if (isAuthorized === "ADMIN" && memberRoleInProject === "ADMIN") {
+    if (isAuthorized === "ADMIN" && toBeRemovedMemberRole === "ADMIN") {
         throw new ApiError(400, "Not Allowed to remove the admin ")
     }
 
@@ -78,6 +86,10 @@ const removeMember = asyncHandler(async (req, res) => {
         project: projectId,
         member: memberId
     })
+
+    if(!removedMember){
+        throw new ApiError(404 , "Member does not exist")
+    }
 
     return res.status(200).json(new ApiResponse(200, removedMember, "Remove the member from the project successfully"))
 
@@ -101,10 +113,10 @@ const changeMemberRole = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
 
-    const isUserExist = await User.findById(memberId)
-    if (!isUserExist) {
-        throw new ApiError(404, "User does not exist")
-    }
+    // const isUserExist = await User.findById(memberId)
+    // if (!isUserExist) {
+    //     throw new ApiError(404, "User does not exist")
+    // }
 
     const memberRoleInProject = await getProjectUserRole(projectId, memberId)
     if (memberRoleInProject === "NON_MEMBER") {
@@ -230,20 +242,24 @@ const getMember = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
 
-    const isUserExist = await User.findById(memberId)
-    if (!isUserExist) {
-        throw new ApiError(404, "User does not exist")
-    }
+    // const isUserExist = await User.findById(memberId)
+    // if (!isUserExist) {
+    //     throw new ApiError(404, "User does not exist")
+    // }
 
-    const memberRoleInProject = await getProjectUserRole(projectId, memberId)
-    if (memberRoleInProject === "NON_MEMBER") {
-        throw new ApiError(400, "Member does not exist in the project")
-    }
+    // const memberRoleInProject = await getProjectUserRole(projectId, memberId)
+    // if (memberRoleInProject === "NON_MEMBER") {
+    //     throw new ApiError(400, "Member does not exist in the project")
+    // }
 
     const memberInfo = await ProjectMember.findOne({
         project: projectId,
         member: memberId
     }).populate("member", "-refreshToken")
+
+    if(!memberInfo){
+        throw new ApiError(404 , "Member does not exist in the project")
+    }
 
     return res.status(200).json(new ApiResponse(200, memberInfo, "Fetched member successfully"))
 

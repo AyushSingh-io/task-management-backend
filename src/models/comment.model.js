@@ -11,7 +11,8 @@ const commentSchema = new Schema({
     task : {
         type : Schema.Types.ObjectId,
         ref : "Task",
-        required: true
+        required: true,
+        index : true
     },
 
     owner : {

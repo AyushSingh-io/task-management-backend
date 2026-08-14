@@ -25,21 +25,21 @@ const createTask = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized request")
     }
 
-    const existedTask = await Task.findOne({
-        name,
-        project: projectId
-    })
+    // const existedTask = await Task.findOne({
+    //     name,
+    //     project: projectId
+    // })
 
-    if (existedTask) {
-        throw new ApiError(400, "Task with name already exists")
-    }
+    // if (existedTask) {
+    //     throw new ApiError(400, "Task with name already exists")
+    // }
 
     const fields = { name, description, status, priority, dueDate }
     const creationFields = { project: projectId }
 
     if (assignedTo !== undefined) {
-        const isMemberOfProject = await getProjectUserRole(projectId, assignedTo)
-        if (isMemberOfProject === "NON_MEMBER") {
+        const assigneeRole = await getProjectUserRole(projectId, assignedTo)
+        if (assigneeRole === "NON_MEMBER") {
             throw new ApiError(400, "Cannot assign a task to a non-member")
         }
         creationFields.assignedTo = assignedTo
@@ -51,8 +51,18 @@ const createTask = asyncHandler(async (req, res) => {
         }
     }
 
-    const createdTask = await Task.create(creationFields)
-    return res.status(201).json(new ApiResponse(201, createdTask, "Task created successfully"))
+    try {
+
+        const createdTask = await Task.create(creationFields)
+        return res.status(201).json(new ApiResponse(201, createdTask, "Task created successfully"))
+
+    } catch (error) {
+        if (error.code === 11000) {
+            throw new ApiError(409, "Task with this name already exists")
+        }
+
+        throw error;
+    }
 
 })
 
@@ -93,7 +103,7 @@ const getTaskById = asyncHandler(async (req, res) => {
     const projectId = task.project
 
     const role = await getProjectUserRole(projectId, req.user._id)
-    
+
     if (role === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
@@ -184,7 +194,7 @@ const deleteTaskById = asyncHandler(async (req, res) => {
         await session.commitTransaction()
         return res.status(200).json(new ApiResponse(200, deletedTask, "Deleted task successfully"))
 
-    } 
+    }
     catch (error) {
         await session.abortTransaction()
         throw error
@@ -217,8 +227,8 @@ const assignTask = asyncHandler(async (req, res) => {
     }
 
     //check if assignedTo is member of the project:
-    const isMember = await getProjectUserRole(projectId, assignedTo)
-    if (isMember === "NON_MEMBER") {
+    const assigneeRole = await getProjectUserRole(projectId, assignedTo)
+    if (assigneeRole === "NON_MEMBER") {
         throw new ApiError(400, "Cannot assign a task to a non-member")
     }
 

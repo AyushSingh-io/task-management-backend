@@ -62,7 +62,7 @@ const getAllComments = asyncHandler(async (req, res) => {
     const allComments = await Comment.find({
         task: taskId
     })
-
+    
     return res.status(200).json(new ApiResponse(200, allComments, "Fetched all comments successfully"))
 
 })
