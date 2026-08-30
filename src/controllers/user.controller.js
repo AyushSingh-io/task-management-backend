@@ -82,7 +82,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const normalizedUsername = username?.toLowerCase()
 
     const user = await User.findOne({
-        $or: [{ normalizedEmail }, { normalizedUsername }]
+        $or: [{ email : normalizedEmail }, { username :normalizedUsername }]
     }).select("+password")
 
     if (!user) {
