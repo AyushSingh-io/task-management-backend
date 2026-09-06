@@ -39,8 +39,10 @@ const addMember = asyncHandler(async (req, res) => {
             member: memberId,
             role: "MEMBER"
         })
+
+        const addedMemberInfo = await ProjectMember.findById(addedMember._id).populate("member", "-refreshToken")
     
-        return res.status(201).json(new ApiResponse(201, addedMember, "Add member to the project successfully"))
+        return res.status(201).json(new ApiResponse(201, addedMemberInfo, "Add member to the project successfully"))
 
     } catch (error) {
         if(error.code === 11000){

@@ -82,7 +82,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const normalizedUsername = username?.toLowerCase()
 
     const user = await User.findOne({
-        $or: [{ email : normalizedEmail }, { username :normalizedUsername }]
+        $or: [{ email: normalizedEmail }, { username: normalizedUsername }]
     }).select("+password")
 
     if (!user) {
@@ -305,6 +305,24 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, req.user, "Fetched user profile successfully"))
 })
 
+const getUserInfo = asyncHandler(async (req, res) => {
+    const { username } = req.body;
+
+    if (!username) {
+        throw new ApiError(400, "Username required")
+    }
+
+    const userInfo = await User.findOne({
+        username
+    }).select("-refreshToken");
+
+    if (!userInfo) {
+        throw new ApiError(404, "User not found");
+    }
+
+    return res.status(200).json(new ApiResponse(200, userInfo, "Fetched User's Information"))
+
+})
 
 export {
     registerUser,
@@ -314,5 +332,6 @@ export {
     changePassword,
     updateProfile,
     updateAvatar,
-    getCurrentUser
+    getCurrentUser,
+    getUserInfo
 }

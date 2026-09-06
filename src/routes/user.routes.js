@@ -7,7 +7,8 @@ import {
     changePassword,
     updateProfile,
     updateAvatar,
-    getCurrentUser
+    getCurrentUser,
+    getUserInfo
 
 } from "../controllers/user.controller.js"
 import {upload} from "../middlewares/multer.middleware.js"
@@ -32,5 +33,7 @@ router.route("/update-profile").patch(verifyJWT, updateProfile)
 router.route("/update-avatar").patch(verifyJWT, upload.single("avatar") , updateAvatar)
 
 router.route("/me").get(verifyJWT, getCurrentUser)
+
+router.route("/get-user-info").post(verifyJWT , getUserInfo)
 
 export default router
