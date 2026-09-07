@@ -276,7 +276,7 @@ const getAllMembers = asyncHandler(async (req, res) => {
     }
 
     const isAuthorized = await getProjectUserRole(projectId, req.user._id)
-    if (isAuthorized !== "OWNER" && isAuthorized !== "ADMIN") {
+    if (isAuthorized === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
 

@@ -95,7 +95,7 @@ const getTaskById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Task Id is required")
     }
 
-    const task = await Task.findById(taskId)
+    const task = await Task.findById(taskId).populate("assignedTo" ,"username email avatar")
     if (!task) {
         throw new ApiError(404, "Task not found")
     }
@@ -103,7 +103,6 @@ const getTaskById = asyncHandler(async (req, res) => {
     const projectId = task.project
 
     const role = await getProjectUserRole(projectId, req.user._id)
-
     if (role === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }

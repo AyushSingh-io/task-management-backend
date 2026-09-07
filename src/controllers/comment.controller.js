@@ -34,7 +34,9 @@ const createComment = asyncHandler(async (req, res) => {
         owner: req.user._id
     })
 
-    return res.status(201).json(new ApiResponse(201, comment, "Add Comment successfully"))
+    const addedComment = await Comment.findById(comment._id).populate("owner", "username email avatar")
+
+    return res.status(201).json(new ApiResponse(201, addedComment, "Add Comment successfully"))
 
 })
 
@@ -61,7 +63,7 @@ const getAllComments = asyncHandler(async (req, res) => {
 
     const allComments = await Comment.find({
         task: taskId
-    })
+    }).populate("owner", "username email avatar")
     
     return res.status(200).json(new ApiResponse(200, allComments, "Fetched all comments successfully"))
 

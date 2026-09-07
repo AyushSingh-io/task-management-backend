@@ -7,6 +7,7 @@ import { ProjectMember } from "../models/projectMember.model.js"
 import mongoose from "mongoose"
 import { Task } from "../models/task.model.js"
 import { Comment } from "../models/comment.model.js"
+import { getProjectUserRole } from "../services/permission.service.js"
 
 
 
@@ -85,9 +86,19 @@ const createProject = asyncHandler(async (req, res) => {
 
 const getAllProjects = asyncHandler(async (req, res) => {
 
-    const projects = await Project.find({
-        owner: req.user._id,
+    // const projects = await Project.find({
+    //     owner: req.user._id,
+    // })
+
+    const memberShips = await ProjectMember.find({
+        member: req.user._id,
     })
+
+    const projectIds = memberShips.map((membership) => (membership.project))
+
+    const projects = await Project.find({
+        _id: { $in: projectIds }
+    }).populate("owner", "username avatar email")
 
     return res.status(200).json(new ApiResponse(200, projects, "All projects fetched successfully"))
 
@@ -101,13 +112,17 @@ const getProjectById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Project Id is required")
     }
 
+    const isAuthorized = await getProjectUserRole(projectId, req.user._id)
+    if (isAuthorized === "NON_MEMBER") {
+        throw new ApiError(403, "Unauthorized request")
+    }
+
     const project = await Project.findOne({
-        owner: req.user._id,
         _id: projectId
-    })
+    }).populate("owner" , "username avatar email")
 
     if (!project) {
-        throw new ApiError(404, "Unauthorized request or Project does not exist ")
+        throw new ApiError(404, "Project does not exist ")
     }
 
     return res.status(200).json(new ApiResponse(200, project, "Fetched project successfully"))
