@@ -112,20 +112,28 @@ const getProjectById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Project Id is required")
     }
 
-    const isAuthorized = await getProjectUserRole(projectId, req.user._id)
-    if (isAuthorized === "NON_MEMBER") {
+    const currUserRoleInProject = await getProjectUserRole(projectId, req.user._id)
+    if (currUserRoleInProject === "NON_MEMBER") {
         throw new ApiError(403, "Unauthorized request")
     }
 
     const project = await Project.findOne({
         _id: projectId
-    }).populate("owner" , "username avatar email")
+    }).populate("owner", "username avatar email")
 
     if (!project) {
         throw new ApiError(404, "Project does not exist ")
     }
 
-    return res.status(200).json(new ApiResponse(200, project, "Fetched project successfully"))
+    console.log(project)
+
+    const projectDetails = {
+        ...project.toObject(),
+        isCurrUserMember: true,
+        currUserRole: currUserRoleInProject
+    };
+
+    return res.status(200).json(new ApiResponse(200, projectDetails, "Fetched project successfully"))
 
 })
 
