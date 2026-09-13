@@ -95,7 +95,7 @@ const getTaskById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Task Id is required")
     }
 
-    const task = await Task.findById(taskId).populate("assignedTo" ,"username email avatar")
+    const task = await Task.findById(taskId).populate("assignedTo", "username email avatar")
     if (!task) {
         throw new ApiError(404, "Task not found")
     }
@@ -269,13 +269,47 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
 
 
 const getAllAssignedTasks = asyncHandler(async (req, res) => {
+    let { page = 1, limit = 10, status } = req.query;
 
-    const assignedTasks = await Task.find({
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
+
+    const filter = {
         assignedTo: req.user._id
-    })
-        .populate("project")
+    }
 
-    return res.status(200).json(new ApiResponse(200, assignedTasks, "Fetched all assigned tasks successfully"))
+    if (status) {
+        filter.status = status
+    }
+
+    const assignedTasks = await Task.find(filter)
+    .populate("project")
+    .skip(skip)
+    .limit(limit);
+
+    const totalTasks = await Task.countDocuments(filter);
+    const totalPages = Math.ceil(totalTasks / limit);
+
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            {
+                assignedTasks,
+                currentPage: page,
+                totalPages,
+                totalTasks
+            },
+            "Fetched all assigned tasks successfully"))
+
+
+    // const assignedTasks = await Task.find({
+    //     assignedTo: req.user._id
+    // })
+    //     .populate("project")
+
+    // return res.status(200).json(new ApiResponse(200, assignedTasks, "Fetched all assigned tasks successfully"))
 
 })
 

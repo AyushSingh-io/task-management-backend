@@ -86,9 +86,11 @@ const createProject = asyncHandler(async (req, res) => {
 
 const getAllProjects = asyncHandler(async (req, res) => {
 
-    // const projects = await Project.find({
-    //     owner: req.user._id,
-    // })
+    let { page = 1, limit = 10, status } = req.query;
+
+    page = Number(page);
+    limit = Number(limit);
+    const skip = (page - 1) * limit;
 
     const memberShips = await ProjectMember.find({
         member: req.user._id,
@@ -96,11 +98,33 @@ const getAllProjects = asyncHandler(async (req, res) => {
 
     const projectIds = memberShips.map((membership) => (membership.project))
 
-    const projects = await Project.find({
-        _id: { $in: projectIds }
-    }).populate("owner", "username avatar email")
+    const filter = {
+        _id: { $in: projectIds },
+    }
 
-    return res.status(200).json(new ApiResponse(200, projects, "All projects fetched successfully"))
+    if (status) {
+        filter.status = status
+    }
+
+    const projects = await Project.find(filter)
+        .populate("owner", "username , avatar , email")
+        .skip(skip)
+        .limit(limit)
+
+    const totalProjects = await Project.countDocuments(filter)
+    const totalPages = Math.ceil(totalProjects / limit)
+
+    return res.status(200)
+        .json(new ApiResponse(
+            200,
+            {
+                projects,
+                currentPage: page,
+                totalPages,
+                totalProjects,
+            },
+            "Fetched all projects successfully"
+        ))
 
 })
 
