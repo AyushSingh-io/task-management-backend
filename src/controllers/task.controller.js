@@ -81,7 +81,7 @@ const getAllTasks = asyncHandler(async (req, res) => {
 
     const tasks = await Task.find({
         project: projectId,
-    })
+    }).populate("assignedTo" , "username avatar email")
 
     return res.status(200).json(new ApiResponse(200, tasks, "Fetched all tasks successfully"))
 
