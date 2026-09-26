@@ -86,7 +86,7 @@ const createProject = asyncHandler(async (req, res) => {
 
 const getAllProjects = asyncHandler(async (req, res) => {
 
-    let { page = 1, limit = 10, status } = req.query;
+    let { page = 1, limit = 10, status, search } = req.query;
 
     page = Number(page);
     limit = Number(limit);
@@ -100,6 +100,10 @@ const getAllProjects = asyncHandler(async (req, res) => {
 
     const filter = {
         _id: { $in: projectIds },
+        name: {
+            $regex: search?.trim() || "",
+            $options: "i"
+        }
     }
 
     if (status) {

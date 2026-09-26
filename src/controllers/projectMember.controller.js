@@ -41,12 +41,12 @@ const addMember = asyncHandler(async (req, res) => {
         })
 
         const addedMemberInfo = await ProjectMember.findById(addedMember._id).populate("member", "-refreshToken")
-    
+
         return res.status(201).json(new ApiResponse(201, addedMemberInfo, "Add member to the project successfully"))
 
     } catch (error) {
-        if(error.code === 11000){
-            throw new ApiError(409 , "Member elready exists in the project")
+        if (error.code === 11000) {
+            throw new ApiError(409, "Member elready exists in the project")
         }
         throw error;
     }
@@ -84,13 +84,43 @@ const removeMember = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Not Allowed to remove the admin ")
     }
 
-    const removedMember = await ProjectMember.findOneAndDelete({
-        project: projectId,
-        member: memberId
-    })
 
-    if(!removedMember){
-        throw new ApiError(404 , "Member does not exist")
+    let removedMember;
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+        removedMember = await ProjectMember.findOneAndDelete({
+            project: projectId,
+            member: memberId,
+        },
+            { session }
+        )
+
+        if (!removedMember) {
+            throw new ApiError(404, "Member does not exist")
+        }
+
+        await Task.updateMany(
+            {
+                project: projectId,
+                assignedTo: memberId
+            },
+            {
+                $set: {
+                    assignedTo: null
+                }
+            },
+            { session }
+        )
+
+        await session.commitTransaction();
+
+    } catch (error) {
+        await session.abortTransaction();
+        throw error
+    }
+    finally {
+        await session.endSession();
     }
 
     return res.status(200).json(new ApiResponse(200, removedMember, "Remove the member from the project successfully"))
@@ -222,7 +252,7 @@ const changeMemberRole = asyncHandler(async (req, res) => {
     } catch (error) {
 
         await session.abortTransaction()
-        throw  error
+        throw error
 
     } finally {
         session.endSession()
@@ -259,8 +289,8 @@ const getMember = asyncHandler(async (req, res) => {
         member: memberId
     }).populate("member", "-refreshToken")
 
-    if(!memberInfo){
-        throw new ApiError(404 , "Member does not exist in the project")
+    if (!memberInfo) {
+        throw new ApiError(404, "Member does not exist in the project")
     }
 
     return res.status(200).json(new ApiResponse(200, memberInfo, "Fetched member successfully"))

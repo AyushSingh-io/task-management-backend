@@ -269,14 +269,18 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
 
 
 const getAllAssignedTasks = asyncHandler(async (req, res) => {
-    let { page = 1, limit = 10, status } = req.query;
+    let { page = 1, limit = 10, status , search } = req.query;
 
     page = Number(page);
     limit = Number(limit);
     const skip = (page - 1) * limit;
 
     const filter = {
-        assignedTo: req.user._id
+        assignedTo: req.user._id,
+        name : {
+            $regex : search?.trim() || "",
+            $options : "i"
+        }
     }
 
     if (status) {
