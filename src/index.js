@@ -13,7 +13,7 @@ const connectToDatabase = async () => {
     try {
         await connectDB()
 
-        app.listen(process.env.PORT, () => {
+        app.listen(process.env.PORT || 7000, () => {
             
             console.log("SERVER LISTENING AT THE PORT : ", process.env.PORT)
         })
